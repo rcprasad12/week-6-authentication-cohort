@@ -7,7 +7,28 @@ app.use (express.json()); // this liine of code help u to extract the body that 
 
 const users = [];
 
-app.post("/signup",function(req,res){
+// 1. Logger middleware function
+function logger(req, res, next) {
+    console.log(req.method + " request came");
+    next();
+}
+
+// 5. Auth middleware function
+function auth(req, res, next) {
+    const token = req.headers.token;
+    const decodedData = jwt.verify(token, JWT_SECRET);
+
+    if (decodedData.username) {
+        req.username = decodedData.username
+        next()
+    } else {
+        res.json({
+            message: "You are not logged in"
+        })
+    }
+}
+
+app.post("/signup",logger,function(req,res){
 
         const username = req.body.username
         const password = req.body.password
@@ -22,7 +43,7 @@ app.post("/signup",function(req,res){
         })
 })
 
-app.post("/signin", function(req,res){
+app.post("/signin", logger, function(req,res){
 
     const username = req.body.username;
     const password = req.body.password;
@@ -46,6 +67,10 @@ app.post("/signin", function(req,res){
             username
         },JWT_SECRET);
 
+        // 4. Set custom headers in /signin
+        res.header("jwt", token);
+        res.header("random", "harkirat");
+
         res.json({
             token: token
         })
@@ -56,18 +81,14 @@ app.post("/signin", function(req,res){
 
 })
 
-app.get("/me", function(req,res){
+app.get("/me", logger, auth, function(req,res){
 
-    const token = req.headers.token;
+    const currentUser = req.username;
 
-    const decodedData = jwt.verify(token,JWT_SECRET);
-
-
-    if(decodedData.username){
-            let foundUser = null;
+    let foundUser = null;
 
     for (let i = 0 ; i < users.length; i++){  //decoding happens thrugh verify of tokken u will be decoded and get u the username 
-        if(users[i].username === decodedData.username) { 
+        if(users[i].username === currentUser) { 
             foundUser = users[i];
 
         }
@@ -76,7 +97,11 @@ app.get("/me", function(req,res){
         username : foundUser.username,
         password:foundUser.password
     })
-  }
+});
+
+// 3. Serve index.html on GET /
+app.get("/", function(req, res) {
+    res.sendFile(__dirname + "/public/index.html");
 });
 
 app.listen(3000);
